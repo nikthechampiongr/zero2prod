@@ -4,6 +4,7 @@ use actix_web::{
     web::{self, Data},
     App, HttpServer,
 };
+use tracing_actix_web::TracingLogger;
 
 pub fn run(
     address: std::net::TcpListener,
@@ -12,6 +13,7 @@ pub fn run(
     let db_pool = Data::new(db_pool);
     let server = HttpServer::new(move || {
         App::new()
+            .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
             .route("/subscribe", web::post().to(subscribe))
             .app_data(db_pool.clone())
