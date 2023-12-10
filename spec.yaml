@@ -6,7 +6,7 @@ name: zero2prod
 region: fra1
 services:
   - name: zero2prod
-    dockerfile_path: DockerFile
+    dockerfile_path: Dockerfile
     source_dir: .
     github: 
       branch: master
