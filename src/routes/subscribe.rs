@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use crate::domain::NewSubscriber;
+use uuid::Uuid;
 
 use actix_web::{
     web::{self, Form},
@@ -13,7 +13,7 @@ use crate::Subscription;
 #[tracing::instrument(
     name = "Adding a new subscriber",
     skip(form, db)
-    fields(         
+    fields(
            subscriber_email = %form.email,
            subscriber_name = %form.name
            )
@@ -22,9 +22,9 @@ pub async fn subscribe(
     Form(form): Form<Subscription>,
     db: web::Data<sqlx::PgPool>,
 ) -> HttpResponse {
-    let sub = match form.try_into(){
+    let sub = match form.try_into() {
         Ok(sub) => sub,
-        Err(_) => return HttpResponse::BadRequest().finish()
+        Err(_) => return HttpResponse::BadRequest().finish(),
     };
     match insert_subscriber(db.as_ref(), sub).await {
         Ok(_) => HttpResponse::Ok().finish(),
