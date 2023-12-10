@@ -25,8 +25,16 @@ async fn subscriptions_valid_request_ret200() {
 async fn subscriptions_invalid_request_ret400() {
     let test_cases = [
         ("email=ursula_le_guin%40gmail.com", "missing name field"),
-        ("name=le%20guin", "missing mail field"),
+        ("name=le%20guin", "missing email field"),
         ("", "missing all fields"),
+        (
+            "email=ursula_le_guin%40gmail.com&name=%20",
+            "whitespace for name",
+        ),
+        (
+            "email=this-aint-it-chief&name=things",
+            "invalid email field",
+        ),
     ];
 
     let address = spawn_app().await.address;

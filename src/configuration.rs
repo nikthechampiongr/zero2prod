@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use secrecy::{ExposeSecret, Secret};
 
 #[derive(serde::Deserialize)]
@@ -58,7 +60,7 @@ impl Environment {
     }
 }
 
-impl std::convert::TryFrom<String> for Environment {
+impl TryFrom<String> for Environment {
     type Error = String;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.as_str() {

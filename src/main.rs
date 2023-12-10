@@ -17,7 +17,7 @@ async fn main() -> Result<(), std::io::Error> {
         .connect_lazy(configuration.database.connection_string().expose_secret())
         .expect("Failed to create database connection");
     run(
-        std::net::TcpListener::bind(address).expect("Failed to bind to port 8000"),
+        std::net::TcpListener::bind(address).expect("Failed to bind to port"),
         db_pool,
     )?
     .await?;

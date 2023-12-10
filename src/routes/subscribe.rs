@@ -1,4 +1,5 @@
 use uuid::Uuid;
+use crate::domain::NewSubscriber;
 
 use actix_web::{
     web::{self, Form},
@@ -21,23 +22,27 @@ pub async fn subscribe(
     Form(form): Form<Subscription>,
     db: web::Data<sqlx::PgPool>,
 ) -> HttpResponse {
-    match insert_subscriber(db.as_ref(), form).await {
+    let sub = match form.try_into(){
+        Ok(sub) => sub,
+        Err(_) => return HttpResponse::BadRequest().finish()
+    };
+    match insert_subscriber(db.as_ref(), sub).await {
         Ok(_) => HttpResponse::Ok().finish(),
-        Err(_) => actix_web::HttpResponse::InternalServerError().finish(),
+        Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
 
 #[tracing::instrument(name = "Saving new subscriber to databse", skip(db, form))]
 async fn insert_subscriber(
     db: &sqlx::PgPool,
-    form: Subscription,
+    form: NewSubscriber,
 ) -> Result<(), sqlx::error::Error> {
     sqlx::query!(
         r#"INSERT INTO subscriptions(id,email,name,subscribed_at)
                  VALUES($1, $2, $3,$4)"#,
         Uuid::new_v4(),
-        form.email,
-        form.name,
+        form.email.as_ref(),
+        form.name.as_ref(),
         chrono::Utc::now()
     )
     .execute(db)
