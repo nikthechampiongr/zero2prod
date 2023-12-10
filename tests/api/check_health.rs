@@ -1,7 +1,5 @@
-use std::sync::OnceLock;
-
-use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor};
+use std::sync::OnceLock;
 use zero2prod::{
     configuration::{get_configuration, DatabaseSettings},
     startup::run,
@@ -56,17 +54,16 @@ pub async fn spawn_app() -> TestApp {
 }
 
 async fn configure_database(config: &DatabaseSettings) -> sqlx::PgPool {
-    let mut connection =
-        sqlx::PgConnection::connect(&config.connection_string_without_db().expose_secret())
-            .await
-            .expect("Failed to connect to postgres instance");
+    let mut connection = sqlx::PgConnection::connect_with(&config.without_db())
+        .await
+        .expect("Failed to connect to postgres instance");
 
     connection
         .execute(format!(r#"CREATE DATABASE "{}""#, config.database_name,).as_str())
         .await
         .expect("Failed to create new database");
 
-    let db_pool = sqlx::PgPool::connect(&config.connection_string().expose_secret())
+    let db_pool = sqlx::PgPool::connect_with(config.with_db())
         .await
         .expect("Failed to connect to database");
     sqlx::migrate!("./migrations")
