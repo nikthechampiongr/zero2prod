@@ -1,3 +1,7 @@
+# I am not even sure why I have this, digitalocean just fails with a cryptic
+# error message on some file it could not find, does not tell me what it is, and
+# half the lines of the logs are completely broken. I guess I won't lose any
+# money.
 name: zero2prod
 region: fra1
 services:
@@ -15,3 +19,8 @@ services:
     instance_size_slug: basic-xxs
     routes:
       - path: /
+databases:
+  - engine: PG
+    name: newsletter
+    num_nodes: 1
+    size: db-s-dev-database
