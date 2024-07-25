@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn invalid_caharacter_name_err() {
-        let name = "Nik'); DROP TABLE subscriptions";
+        let name = "Nik'); DROP TABLE subscriptions --";
         assert_err!(SubscriberName::parse(name));
     }
 }

@@ -2,3 +2,6 @@ application:
   host: 0.0.0.0
 database:
   require_ssl: true
+email_client:
+  base_url: "https://api.postmarkapp.com"
+  sender_email: "146efd9d54bcd617444a4195880577ac@inbound.postmarkapp.com"

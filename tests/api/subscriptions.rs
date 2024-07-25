@@ -1,8 +1,8 @@
-use crate::check_health::spawn_app;
+use crate::check_health::{spawn_app, TestApp};
 
 #[actix_web::test]
 async fn subscriptions_valid_request_ret200() {
-    let crate::check_health::TestApp { address, db_pool } = spawn_app().await;
+    let TestApp { address, db_pool } = spawn_app().await;
     let client = reqwest::Client::new();
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = client
@@ -35,6 +35,8 @@ async fn subscriptions_invalid_request_ret400() {
             "email=this-aint-it-chief&name=things",
             "invalid email field",
         ),
+        ("email=ursula_le_guin%40gmail.com&name=", "Empty name"),
+        ("email=&name=le%20guin", "Empty email"),
     ];
 
     let address = spawn_app().await.address;

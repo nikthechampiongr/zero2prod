@@ -5,6 +5,7 @@ use zero2prod::{
     startup::run,
     telemetry,
 };
+use zero2prod::email_client::EmailClient;
 
 pub struct TestApp {
     pub address: String,
@@ -44,9 +45,15 @@ pub async fn spawn_app() -> TestApp {
     configuration.database.database_name = uuid::Uuid::new_v4().to_string();
     let db_pool = configure_database(&configuration.database).await;
 
+    let sender_email = configuration.email_client.sender().expect("Invalid email address");
+
+    let timeout = configuration.email_client.timeout();
+
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email, configuration.email_client.authorization_token, timeout);
+
     let listener = std::net::TcpListener::bind("localhost:0").expect("Failed to bind to a port");
     let port = listener.local_addr().unwrap().port();
-    let server = run(listener, db_pool.clone()).expect("Failed to bind address");
+    let server = run(listener, db_pool.clone(), email_client).expect("Failed to bind address");
     tokio::spawn(server);
 
     let address = format!("http://localhost:{port}");
