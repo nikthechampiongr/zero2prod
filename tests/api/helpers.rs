@@ -10,6 +10,7 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: sqlx::PgPool,
     pub email_server: MockServer,
+    pub port: u16,
 }
 
 impl TestApp {
@@ -59,14 +60,16 @@ pub async fn spawn_app() -> TestApp {
     let application = Application::build(configuration.clone())
         .await
         .expect("Failed to build application");
+    let application_port = application.port();
     let address = format!("http://127.0.0.1:{}", application.port());
 
-    let _ = tokio::spawn(application.run_until_stopped());
+    _ = tokio::spawn(application.run_until_stopped());
 
     TestApp {
         address,
         db_pool: get_connection_pool(&configuration.database),
         email_server,
+        port: application_port,
     }
 }
 
@@ -88,4 +91,34 @@ async fn configure_database(config: &DatabaseSettings) -> sqlx::PgPool {
         .await
         .expect("Failed to run migrations");
     db_pool
+}
+
+pub struct ConfirmationLinks {
+    pub html_link: reqwest::Url,
+    pub plain_link: reqwest::Url,
+}
+
+impl ConfirmationLinks {
+    pub fn get_confirmation_link(request: &wiremock::Request, port: u16) -> ConfirmationLinks {
+        let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
+
+        let get_link = |s: &str| {
+            let links: Vec<_> = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect();
+            assert_eq!(links.len(), 1);
+            let link = links[0].as_str().to_owned();
+            let mut link = reqwest::Url::parse(&link).unwrap();
+            link.set_port(Some(port)).unwrap();
+            //Please do not send stuff outside localhost
+            assert_eq!(link.host_str().unwrap(), "127.0.0.1");
+            link
+        };
+
+        ConfirmationLinks {
+            html_link: get_link(body["HtmlBody"].as_str().unwrap()),
+            plain_link: get_link(body["TextBody"].as_str().unwrap()),
+        }
+    }
 }
