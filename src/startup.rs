@@ -1,18 +1,18 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{health_check, subscribe};
+use crate::routes::{health_check, subscription};
 use actix_web::{
     dev::Server,
     web::{self, Data},
     App, HttpServer,
 };
-use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use tracing_actix_web::TracingLogger;
 
 pub struct Application {
     port: u16,
-    server: Server
+    server: Server,
 }
 
 impl Application {
@@ -43,7 +43,10 @@ impl Application {
         let listener = std::net::TcpListener::bind(address).expect("Failed to bind to port");
         let port = listener.local_addr().unwrap().port();
 
-        Ok(Self {port, server: run(listener, db_pool, email_client)? })
+        Ok(Self {
+            port,
+            server: run(listener, db_pool, email_client)?,
+        })
     }
 
     pub fn port(&self) -> u16 {
@@ -55,7 +58,7 @@ impl Application {
     }
 }
 
-pub fn get_connection_pool (configuration: &DatabaseSettings) -> PgPool {
+pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
     PgPoolOptions::new().connect_lazy_with(configuration.with_db())
 }
 
@@ -70,7 +73,7 @@ pub fn run(
         App::new()
             .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
-            .route("/subscribe", web::post().to(subscribe))
+            .route("/subscription", web::post().to(subscription))
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
     })

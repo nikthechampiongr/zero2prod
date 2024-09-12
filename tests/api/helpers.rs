@@ -9,13 +9,13 @@ use zero2prod::telemetry::init_subscriber;
 pub struct TestApp {
     pub address: String,
     pub db_pool: sqlx::PgPool,
-    pub email_server: MockServer
+    pub email_server: MockServer,
 }
 
 impl TestApp {
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
         reqwest::Client::new()
-            .post(format!("{}/subscribe", &self.address))
+            .post(format!("{}/subscription", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
@@ -66,7 +66,7 @@ pub async fn spawn_app() -> TestApp {
     TestApp {
         address,
         db_pool: get_connection_pool(&configuration.database),
-        email_server
+        email_server,
     }
 }
 

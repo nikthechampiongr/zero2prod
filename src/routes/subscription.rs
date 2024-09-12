@@ -18,7 +18,7 @@ use tracing::error;
            subscriber_name = %form.name
            )
 )]
-pub async fn subscribe(
+pub async fn subscription(
     Form(form): Form<Subscription>,
     db: web::Data<sqlx::PgPool>,
     email_client: web::Data<EmailClient>,
