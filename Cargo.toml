@@ -42,3 +42,4 @@ strip = true
 claims = "0.7"
 wiremock = "0.6.1"
 serde_json = "1.0"
+linkify = "0.10"

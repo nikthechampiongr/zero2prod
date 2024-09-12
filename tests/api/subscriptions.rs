@@ -1,9 +1,21 @@
 use crate::helpers::spawn_app;
+use wiremock::{
+    matchers::{method, path},
+    Mock, ResponseTemplate,
+};
 
 #[actix_web::test]
 async fn subscriptions_valid_request_ret200() {
-    let app  = spawn_app().await;
+    let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
     let response = app.post_subscriptions(body.to_string()).await;
     assert_eq!(response.status().as_u16(), 200);
 
@@ -44,3 +56,4 @@ async fn subscriptions_invalid_request_ret400() {
         );
     }
 }
+
