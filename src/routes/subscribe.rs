@@ -11,7 +11,7 @@ use crate::Subscription;
 use tracing::error;
 
 #[tracing::instrument(
-    name = "Adding a new subscriber",
+    name = "Add a new subscriber",
     skip(form, db, email_client)
     fields(
            subscriber_email = %form.email,
@@ -27,34 +27,26 @@ pub async fn subscribe(
         Ok(sub) => sub,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    if  insert_subscriber(db.as_ref(), &sub).await.is_err() {
+
+    if insert_subscriber(db.as_ref(), &sub).await.is_err() {
         return HttpResponse::InternalServerError().finish();
     }
 
-    if email_client
-        .send_email(
-            sub.email,
-            "welcome!",
-            "welcome to our newsletter!",
-            "welcome to our newsletter!",
-        )
-        .await
-        .is_err()
-    {
+    if send_email(&email_client, sub).await.is_err() {
         return HttpResponse::InternalServerError().finish();
     }
 
     HttpResponse::Ok().finish()
 }
 
-#[tracing::instrument(name = "Saving new subscriber to database", skip(db, form))]
+#[tracing::instrument(name = "Save new subscriber to database", skip(db, form))]
 async fn insert_subscriber(
     db: &sqlx::PgPool,
     form: &NewSubscriber,
 ) -> Result<(), sqlx::error::Error> {
     sqlx::query!(
         r#"INSERT INTO subscriptions(id,email,name,subscribed_at, status)
-                 VALUES($1, $2, $3,$4, 'confirmed')"#,
+                 VALUES($1, $2, $3,$4, 'pending_confirmation')"#,
         Uuid::new_v4(),
         form.email.as_ref(),
         form.name.as_ref(),
@@ -67,4 +59,23 @@ async fn insert_subscriber(
         e
     })?;
     Ok(())
+}
+
+#[tracing::instrument(
+    name = "Send confirmation email to new subscriber",
+    skip(email_client, sub)
+)]
+async fn send_email(email_client: &EmailClient, sub: NewSubscriber) -> Result<(), reqwest::Error> {
+    let confirmation_link = "http://www.example.com/subscriptions/confirm";
+    let html_body = format!(
+        "welcome to our newsletter!<br/> \
+         Click <a href=\"{confirmation_link}\">"
+    );
+    let plain_body = format!(
+        "welcome to our newsletter!\nVisit {confirmation_link} to confirm your subscription"
+    );
+
+    email_client
+        .send_email(sub.email, "welcome!", &html_body, &plain_body)
+        .await
 }
