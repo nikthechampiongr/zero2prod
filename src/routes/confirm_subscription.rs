@@ -19,7 +19,7 @@ pub async fn confirm(parameters: Query<Parameters>, pool: web::Data<sqlx::PgPool
             Err(_) => return HttpResponse::InternalServerError().finish(),
         };
 
-    if let Err(_) = confirm_subscriber(pool.as_ref(), subscriber_id).await {
+    if (confirm_subscriber(pool.as_ref(), subscriber_id).await).is_err() {
         return HttpResponse::InternalServerError().finish();
     }
     HttpResponse::Ok().finish()
