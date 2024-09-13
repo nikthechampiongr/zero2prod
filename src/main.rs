@@ -1,5 +1,5 @@
-use zero2prod::{configuration::get_configuration, telemetry::*};
 use zero2prod::startup::Application;
+use zero2prod::{configuration::get_configuration, telemetry::*};
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -7,6 +7,9 @@ async fn main() -> Result<(), std::io::Error> {
     init_subscriber(subscriber);
 
     let configuration = get_configuration().expect("Failed to read configuration.");
-    Application::build(configuration).await?.run_until_stopped().await?;
+    Application::build(configuration)
+        .await?
+        .run_until_stopped()
+        .await?;
     Ok(())
 }

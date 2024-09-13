@@ -1,6 +1,6 @@
+use crate::domain::SubscriberEmail;
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
-use crate::domain::SubscriberEmail;
 
 pub struct EmailClient {
     client: Client,
@@ -14,13 +14,10 @@ impl EmailClient {
         base_url: String,
         sender: SubscriberEmail,
         authorization_token: Secret<String>,
-        timeout: std::time::Duration
+        timeout: std::time::Duration,
     ) -> Self {
         Self {
-            client: Client::builder()
-                .timeout(timeout)
-                .build()
-                .unwrap(),
+            client: Client::builder().timeout(timeout).build().unwrap(),
             base_url,
             sender,
             authorization_token,
@@ -116,9 +113,13 @@ mod tests {
     }
 
     fn email_client(base_url: String) -> EmailClient {
-        EmailClient::new(base_url, email(), Secret::new(Faker.fake()), std::time::Duration::from_millis(200))
+        EmailClient::new(
+            base_url,
+            email(),
+            Secret::new(Faker.fake()),
+            std::time::Duration::from_millis(200),
+        )
     }
-
 
     #[tokio::test]
     async fn send_email_sends_the_expected_request() {
