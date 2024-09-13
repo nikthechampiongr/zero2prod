@@ -94,9 +94,8 @@ async fn insert_subscriber(
     )
     .execute(&mut **db)
     .await
-    .map_err(|e| {
+    .inspect_err(|e| {
         error!("Failed to insert subscriber to database: {e:?}");
-        e
     })?;
     Ok(uuid)
 }
@@ -139,9 +138,8 @@ async fn store_token(
     )
     .execute(&mut **pool)
     .await
-    .map_err(|e| {
+    .inspect_err(|e| {
         tracing::error!("Failed to execute query: {e:?}");
-        e
     })?;
 
     Ok(())
