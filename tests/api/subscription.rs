@@ -1,4 +1,5 @@
 use crate::helpers::{spawn_app, ConfirmationLinks};
+use sqlx::query;
 use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
@@ -85,7 +86,7 @@ async fn subscribe_persists_the_new_subscriber() {
 
     app.post_subscriptions(body.into()).await;
 
-    let subscription = sqlx::query!("SELECT email,name,status FROM subscriptions")
+    let subscription = query!("SELECT email,name,status FROM subscriptions")
         .fetch_one(&app.db_pool)
         .await
         .unwrap();
@@ -93,4 +94,19 @@ async fn subscribe_persists_the_new_subscriber() {
     assert_eq!(subscription.email, "ursula_le_guin@gmail.com");
     assert_eq!(subscription.name, "le guin");
     assert_eq!(subscription.status, "pending_confirmation")
+}
+
+#[actix_web::test]
+async fn subscribe_fails_for_fatal_database_error() {
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    query!("ALTER TABLE subscriptions DROP COLUMN email")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+
+    let response = app.post_subscriptions(body.into()).await;
+
+    assert_eq!(response.status().as_u16(), 500);
 }

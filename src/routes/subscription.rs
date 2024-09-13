@@ -1,16 +1,19 @@
+use std::fmt::{self, Debug};
+
 use crate::{domain::NewSubscriber, startup::ApplicationBaseUrl};
+use anyhow::Context;
 use rand::{distributions::Alphanumeric, Rng};
 use sqlx::Postgres;
 use uuid::Uuid;
 
 use actix_web::{
+    http::StatusCode,
     web::{self, Form},
-    HttpResponse,
+    HttpResponse, ResponseError,
 };
 
 use crate::email_client::EmailClient;
 use crate::Subscription;
-use tracing::error;
 
 fn get_subscription_token() -> String {
     let mut rng = rand::thread_rng();
@@ -33,49 +36,35 @@ pub async fn subscription(
     db: web::Data<sqlx::PgPool>,
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
-) -> HttpResponse {
-    let sub = match form.try_into() {
-        Ok(sub) => sub,
-        Err(_) => return HttpResponse::BadRequest().finish(),
-    };
+) -> Result<HttpResponse, SubscribeError> {
+    let sub = form.try_into().map_err(SubscribeError::ValidationError)?;
 
-    let mut transaction = match db.as_ref().begin().await {
-        Ok(transaction) => transaction,
-        Err(e) => {
-            tracing::error!("Failed to begin transaction: {e:?}");
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
+    let mut transaction = db
+        .as_ref()
+        .begin()
+        .await
+        .context("Failed to get Postgres connection from Pool.")?;
 
-    let subscriber_id = match insert_subscriber(&mut transaction, &sub).await {
-        Ok(uuid) => uuid,
-        Err(_) => {
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
+    let subscriber_id = insert_subscriber(&mut transaction, &sub)
+        .await
+        .context("Failed to insert new subscriber into database.")?;
 
     let token = get_subscription_token();
 
-    if store_token(&mut transaction, subscriber_id, &token)
+    store_token(&mut transaction, subscriber_id, &token)
         .await
-        .is_err()
-    {
-        return HttpResponse::InternalServerError().finish();
-    }
+        .context("Failed to store confirmation token into database")?;
 
-    if let Err(e) = transaction.commit().await {
-        tracing::error!("Failed to commit transaction: {e:?}");
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    if send_email(&email_client, sub, &base_url.0, &token)
+    transaction
+        .commit()
         .await
-        .is_err()
-    {
-        return HttpResponse::InternalServerError().finish();
-    }
+        .context("Failed to commit new subscriber into database.")?;
 
-    HttpResponse::Ok().finish()
+    send_email(&email_client, sub, &base_url.0, &token)
+        .await
+        .context("Failed to send confirmation email to new subscriber.")?;
+
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[tracing::instrument(name = "Save new subscriber to database", skip(db, form))]
@@ -95,7 +84,7 @@ async fn insert_subscriber(
     .execute(&mut **db)
     .await
     .inspect_err(|e| {
-        error!("Failed to insert subscriber to database: {e:?}");
+        tracing::error!("Failed to insert subscriber to database: {e:?}");
     })?;
     Ok(uuid)
 }
@@ -137,10 +126,46 @@ async fn store_token(
         token
     )
     .execute(&mut **pool)
-    .await
-    .inspect_err(|e| {
-        tracing::error!("Failed to execute query: {e:?}");
-    })?;
+    .await?;
 
+    Ok(())
+}
+
+#[derive(thiserror::Error)]
+pub enum SubscribeError {
+    #[error("{0}")]
+    ValidationError(String),
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+}
+
+impl Debug for SubscribeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl ResponseError for SubscribeError {
+    fn status_code(&self) -> StatusCode {
+        if let Self::ValidationError(_) = self {
+            StatusCode::BAD_REQUEST
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+fn error_chain_fmt(
+    e: &impl std::error::Error,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    writeln!(f, "{}\n", e)?;
+
+    let mut current = e.source();
+
+    while let Some(cause) = current {
+        writeln!(f, "Caused by:\n\t{}", cause)?;
+        current = cause.source();
+    }
     Ok(())
 }
