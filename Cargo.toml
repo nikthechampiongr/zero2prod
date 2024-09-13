@@ -19,7 +19,7 @@ config = "0.13.3"
 reqwest = { version = "0.11.18", features = ["json"] }
 serde = {version = "1", features = ["std", "serde_derive"]}
 serde-aux = "4"
-sqlx = { version = "0.7.1", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "migrate"] }
+sqlx = { version = "0.8.2", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "migrate"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 uuid = {version ="1.4.1", features = ["v4", "fast-rng"]}
 tracing = {version = "0.1", features = ["log"]}
