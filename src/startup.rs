@@ -16,7 +16,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(configuration: Settings) -> Result<Self, std::io::Error> {
+    pub fn build(configuration: Settings) -> Result<Self, std::io::Error> {
         let address = format!(
             "{}:{}",
             configuration.application.host, configuration.application.port

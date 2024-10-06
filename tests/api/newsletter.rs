@@ -76,13 +76,7 @@ async fn newsletters_are_not_delivered_for_unconfirmed_subscribers() {
     }
     });
 
-    let response = reqwest::Client::new()
-        .post(format!("{}/newsletters", app.address))
-        .json(&newsletter_request_body)
-        .send()
-        .await
-        .unwrap();
-
+    let response = app.post_newsletter(newsletter_request_body).await;
     assert_eq!(response.status().as_u16(), 200);
 }
 
@@ -110,6 +104,79 @@ async fn newsletters_get_delivered_to_confirmed_subscribers() {
     let response = app.post_newsletter(newsletter_request_body).await;
 
     assert_eq!(response.status().as_u16(), 200);
+}
+
+#[actix_web::test]
+async fn requests_missing_authentication_header_are_rejected() {
+    let app = spawn_app().await;
+    let body = serde_json::json!({
+    "title": "Newsletter title",
+    "content": {
+    "text": "Newsletter body as plain text",
+    "html": "<p>Newsletter body as HTML</p>" ,
+    }
+    });
+
+    let response = reqwest::Client::new()
+        .post(format!("{}/newsletters", app.address))
+        .json(&body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(response.status().as_u16(), 401);
+    assert_eq!(
+        response.headers()["WWW-Authenticate"],
+        r#"Basic realm="publish""#
+    )
+}
+
+#[actix_web::test]
+async fn non_existing_users_are_rejected() {
+    let app = spawn_app().await;
+    let body = serde_json::json!({
+    "title": "Newsletter title",
+    "content": {
+    "text": "Newsletter body as plain text",
+    "html": "<p>Newsletter body as HTML</p>" ,
+    }
+    });
+
+    let response = reqwest::Client::new()
+        .post(format!("{}/newsletters", app.address))
+        .json(&body)
+        // All users generated for tests are v4 UUIDs so something like this should never be
+        // generated
+        .basic_auth("NonExisting", None::<String>)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(response.status().as_u16(), 401);
+}
+
+#[actix_web::test]
+async fn invalid_passwords_are_rejected() {
+    let app = spawn_app().await;
+    let body = serde_json::json!({
+    "title": "Newsletter title",
+    "content": {
+    "text": "Newsletter body as plain text",
+    "html": "<p>Newsletter body as HTML</p>" ,
+    }
+    });
+
+    let response = reqwest::Client::new()
+        .post(format!("{}/newsletters", app.address))
+        .json(&body)
+        // All passwords generated for tests are v4 UUIDs so something like this should never be
+        // generated
+        .basic_auth(app.test_user.username, Some("Invalid password"))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(response.status().as_u16(), 401);
 }
 
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {

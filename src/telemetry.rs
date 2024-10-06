@@ -43,3 +43,12 @@ pub fn init_subscriber(subscriber: impl tracing::Subscriber + Send + Sync) {
 
     set_global_default(subscriber).expect("Failed to set subscriber.");
 }
+
+/// Spawn a blocking task while preserving the current span.
+pub fn spawn_blocking_with_async<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+    f: F,
+) -> tokio::task::JoinHandle<R> {
+    let current_span = tracing::Span::current();
+
+    tokio::task::spawn_blocking(move || current_span.in_scope(f))
+}

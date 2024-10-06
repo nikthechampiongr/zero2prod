@@ -1,5 +1,7 @@
+use argon2::PasswordHasher;
 use once_cell::sync::Lazy;
-use sqlx::{Connection, Executor};
+use sqlx::{Connection, Executor, PgPool};
+use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::startup::{get_connection_pool, Application};
@@ -11,6 +13,7 @@ pub struct TestApp {
     pub db_pool: sqlx::PgPool,
     pub email_server: MockServer,
     pub port: u16,
+    pub test_user: TestUser,
 }
 
 impl TestApp {
@@ -28,6 +31,7 @@ impl TestApp {
         reqwest::Client::new()
             .post(format!("{}/newsletters", self.address))
             .json(&body)
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .send()
             .await
             .unwrap()
@@ -66,20 +70,26 @@ pub async fn spawn_app() -> TestApp {
 
     configure_database(&configuration.database).await;
 
-    let application = Application::build(configuration.clone())
-        .await
-        .expect("Failed to build application");
+    let application =
+        Application::build(configuration.clone()).expect("Failed to build application");
     let application_port = application.port();
     let address = format!("http://127.0.0.1:{}", application.port());
 
     _ = tokio::spawn(application.run_until_stopped());
 
-    TestApp {
+    let test_user = TestUser::generate();
+
+    let app = TestApp {
         address,
         db_pool: get_connection_pool(&configuration.database),
         email_server,
         port: application_port,
-    }
+        test_user,
+    };
+
+    app.test_user.store(&app.db_pool).await;
+
+    app
 }
 
 async fn configure_database(config: &DatabaseSettings) -> sqlx::PgPool {
@@ -95,11 +105,53 @@ async fn configure_database(config: &DatabaseSettings) -> sqlx::PgPool {
     let db_pool = sqlx::PgPool::connect_with(config.with_db())
         .await
         .expect("Failed to connect to database");
+
     sqlx::migrate!("./migrations")
         .run(&db_pool)
         .await
         .expect("Failed to run migrations");
+
     db_pool
+}
+
+pub struct TestUser {
+    pub uuid: Uuid,
+    pub username: String,
+    pub password: String,
+}
+
+impl TestUser {
+    fn generate() -> Self {
+        Self {
+            uuid: Uuid::new_v4(),
+            username: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+        }
+    }
+
+    async fn store(&self, db_pool: &PgPool) {
+        let argon2 = argon2::Argon2::new(
+            argon2::Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            argon2::Params::new(19 * 1024, 2, 1, None).unwrap(),
+        );
+
+        let salt = argon2::password_hash::SaltString::generate(rand::thread_rng());
+
+        let hash = argon2
+            .hash_password(self.password.as_bytes(), &salt)
+            .unwrap();
+
+        sqlx::query!(
+            "INSERT INTO users (user_id, username, password_hash) VALUES ($1,$2,$3)",
+            self.uuid,
+            self.username,
+            hash.to_string()
+        )
+        .execute(db_pool)
+        .await
+        .expect("Failed to create test user");
+    }
 }
 
 pub struct ConfirmationLinks {
