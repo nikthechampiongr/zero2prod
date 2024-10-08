@@ -1,5 +1,6 @@
 application:
   port: 8000
+  hmac_secret: "default-hmac-secret-oh-god-do-not-use-this-for-actual-purposes-just-for-testing"
 database:
   host: "localhost"
   port: 5432
