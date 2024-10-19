@@ -1,18 +1,17 @@
 use crate::authentication::{AuthError, Credentials};
 use crate::routes::error_chain_fmt;
-use crate::startup::HmacSecret;
+use crate::session_state::TypedSession;
 use actix_web::error::InternalError;
 use actix_web::HttpResponse;
-use hmac::{Hmac, Mac};
-use secrecy::ExposeSecret;
+use actix_web_flash_messages::FlashMessage;
 use secrecy::Secret;
 use sqlx::PgPool;
 
-#[tracing::instrument(name = "Login", skip(form, pg_pool, secret), fields(username=tracing::field::Empty, user_id=tracing::field::Empty) )]
+#[tracing::instrument(name = "Login", skip(form, pg_pool, session), fields(username=tracing::field::Empty, user_id=tracing::field::Empty) )]
 pub async fn login(
     form: actix_web::web::Form<LoginForm>,
     pg_pool: actix_web::web::Data<PgPool>,
-    secret: actix_web::web::Data<HmacSecret>,
+    session: TypedSession,
 ) -> Result<HttpResponse, InternalError<LoginError>> {
     tracing::Span::current().record("username", tracing::field::display(&form.username));
     let credentials = Credentials {
@@ -23,38 +22,33 @@ pub async fn login(
     match crate::authentication::validate_credentials(&pg_pool, credentials).await {
         Ok(user_id) => {
             tracing::Span::current().record("user_id", tracing::field::display(&user_id));
+            session.renew();
+            session
+                .insert_user_id(user_id)
+                .map_err(|e| login_err(LoginError::UnknownError(e.into())))?;
             Ok(HttpResponse::SeeOther()
-                .insert_header((actix_web::http::header::LOCATION, "/"))
+                .insert_header((actix_web::http::header::LOCATION, "/admin/dashboard"))
                 .finish())
         }
-        Err(e) => {
-            let e = match e {
-                AuthError::AuthError(e) => LoginError::AuthError(e),
-                AuthError::UnexpectedError(e) => LoginError::UnknownError(e),
-            };
-            let encoded_error = format!("error={}", urlencoding::Encoded::new(e.to_string()));
-            let hmac_tag = {
-                let mut mac =
-                    Hmac::<sha2::Sha256>::new_from_slice(secret.0.expose_secret().as_bytes())
-                        .unwrap();
-                mac.update(encoded_error.to_string().as_bytes());
-                mac.finalize().into_bytes()
-            };
-
-            let response = HttpResponse::SeeOther()
-                .insert_header((
-                    actix_web::http::header::LOCATION,
-                    format!("/login?{encoded_error}&tag={hmac_tag:x}"),
-                ))
-                .finish();
-            Err(InternalError::from_response(e, response))
-        }
+        Err(e) => match e {
+            AuthError::AuthError(e) => Err(login_err(LoginError::AuthError(e))),
+            AuthError::UnexpectedError(e) => Err(login_err(LoginError::UnknownError(e))),
+        },
     }
+}
+
+fn login_err(e: LoginError) -> InternalError<LoginError> {
+    FlashMessage::error(e.to_string()).send();
+    let response = HttpResponse::SeeOther()
+        .insert_header((actix_web::http::header::LOCATION, "/login"))
+        .finish();
+    tracing::error!("{response:?}");
+    InternalError::from_response(e, response)
 }
 
 #[derive(thiserror::Error)]
 pub enum LoginError {
-    #[error("Invalid login crdentials")]
+    #[error("Invalid login credentials")]
     AuthError(#[source] anyhow::Error),
     #[error("An unexpected error occurred while trying to authenticate")]
     UnknownError(#[source] anyhow::Error),
