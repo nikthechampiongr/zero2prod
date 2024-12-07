@@ -1,6 +1,7 @@
 use crate::authentication::{AuthError, Credentials};
 use crate::routes::error_chain_fmt;
 use crate::session_state::TypedSession;
+use crate::util::see_other;
 use actix_web::error::InternalError;
 use actix_web::HttpResponse;
 use actix_web_flash_messages::FlashMessage;
@@ -26,9 +27,7 @@ pub async fn login(
             session
                 .insert_user_id(user_id)
                 .map_err(|e| login_err(LoginError::UnknownError(e.into())))?;
-            Ok(HttpResponse::SeeOther()
-                .insert_header((actix_web::http::header::LOCATION, "/admin/dashboard"))
-                .finish())
+            Ok(see_other("/admin/dashboard"))
         }
         Err(e) => match e {
             AuthError::AuthError(e) => Err(login_err(LoginError::AuthError(e))),
@@ -39,10 +38,7 @@ pub async fn login(
 
 fn login_err(e: LoginError) -> InternalError<LoginError> {
     FlashMessage::error(e.to_string()).send();
-    let response = HttpResponse::SeeOther()
-        .insert_header((actix_web::http::header::LOCATION, "/login"))
-        .finish();
-    tracing::error!("{response:?}");
+    let response = see_other("/login");
     InternalError::from_response(e, response)
 }
 

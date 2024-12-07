@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context};
+use argon2::PasswordHasher;
 use argon2::PasswordVerifier;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
@@ -69,6 +70,23 @@ fn verify_password_hash(
     Ok(())
 }
 
+fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>, anyhow::Error> {
+    let argon2 = argon2::Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        argon2::Params::new(19 * 1024, 2, 1, None).unwrap(),
+    );
+
+    let salt = argon2::password_hash::SaltString::generate(rand::thread_rng());
+
+    let hash = Secret::new(
+        argon2
+            .hash_password(password.expose_secret().as_bytes(), &salt)?
+            .to_string(),
+    );
+    Ok(hash)
+}
+
 #[tracing::instrument(name = "Get stored crdentials", skip(username, db_pool))]
 async fn get_stored_credentials(
     db_pool: &PgPool,
@@ -84,4 +102,24 @@ async fn get_stored_credentials(
     .map(|row| (row.user_id, Secret::new(row.password_hash)));
 
     Ok(row)
+}
+
+#[tracing::instrument(name = "Change password", skip(new_password, pool))]
+pub async fn change_password(
+    user_id: Uuid,
+    new_password: Secret<String>,
+    pool: &PgPool,
+) -> Result<(), anyhow::Error> {
+    let hash = spawn_blocking_with_async(move || compute_password_hash(new_password))
+        .await?
+        .context("Failed to has password")?;
+    sqlx::query!(
+        "UPDATE users SET password_hash = $1 WHERE user_id = $2",
+        hash.expose_secret(),
+        user_id
+    )
+    .execute(pool)
+    .await
+    .context("Failed to change user's password in the database")?;
+    Ok(())
 }
