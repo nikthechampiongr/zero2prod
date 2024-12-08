@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en-US">
+    <head>
+        <meta charset="UTF-8">
+        <title>Send Newsletter</title>
+    </head>
+    <body>
+        <p><i>{}</i></p>
+        <h1>Send a Newsletter</h1>
+        <form action="/newsletters" method="post">
+            <label> Title<br></Label>
+            <input name="title" type="text" placeholder="Enter title" required><br></label>
+            <label>Html Content<br>
+                <textarea name="html"  placeholder="Enter html content" required></textarea></label> <br>
+            <label>Plaintext Content<br>
+            <textarea name="text"  placeholder="Enter plaintext content"
+                required></textarea></label> <br>
+            <input type="submit" value="Send">
+        </form>
+    </body>
+</html>

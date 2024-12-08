@@ -31,9 +31,8 @@ impl TestApp {
 
     pub async fn post_newsletter(&self, body: serde_json::Value) -> Response {
         self.api_client
-            .post(format!("{}/newsletters", self.address))
-            .json(&body)
-            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
+            .post(format!("{}/admin/newsletters", self.address))
+            .form(&body)
             .send()
             .await
             .expect("Failed to execute Request")

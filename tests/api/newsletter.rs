@@ -3,64 +3,22 @@ use wiremock::{
     Mock, ResponseTemplate,
 };
 
-use crate::helpers::{spawn_app, ConfirmationLinks, TestApp};
-
-#[actix_web::test]
-async fn newsletter_returns_400_for_bad_data() {
-    let app = spawn_app().await;
-
-    let test_cases = [
-        (
-            serde_json::json!({
-                "content": {
-                    "text": "Newsletter body as plain text",
-                    "html": "<p>Newsletter body as HTML</p>" ,
-                }
-            }),
-            "Missing title",
-        ),
-        (
-            serde_json::json!({
-            "title": "Newsletter title"}),
-            "Missing content",
-        ),
-        (
-            serde_json::json!({
-                "title": "Newsletter title",
-                "content": {
-                    "html": "<p>Newsletter body as HTML</p>" ,
-                }
-            }),
-            "Missing text",
-        ),
-        (
-            serde_json::json!({
-                "title": "Newsletter title",
-                "content": {
-                    "text": "Newsletter body as plain text",
-                }
-            }),
-            "Missing html",
-        ),
-    ];
-
-    for (invalid_body, reason) in test_cases {
-        let response = app.post_newsletter(invalid_body).await;
-
-        assert_eq!(
-            response.status().as_u16(),
-            400,
-            "The API payload did not return 400 Bad Request when Payload was: {}",
-            reason
-        );
-    }
-}
+use crate::helpers::{assert_is_redirect_to, spawn_app, ConfirmationLinks, TestApp};
 
 #[actix_web::test]
 async fn newsletters_are_not_delivered_for_unconfirmed_subscribers() {
     let app = spawn_app().await;
 
     create_unconfirmed_subscriber(&app).await;
+
+    let login_body = serde_json::json!({
+        "username": app.test_user.username,
+        "password": app.test_user.password
+    });
+
+    let response = app.post_login(login_body).await;
+
+    assert_is_redirect_to(&response, "/admin/dashboard");
 
     Mock::given(any())
         .respond_with(ResponseTemplate::new(200))
@@ -70,14 +28,36 @@ async fn newsletters_are_not_delivered_for_unconfirmed_subscribers() {
 
     let newsletter_request_body = serde_json::json!({
     "title": "Newsletter title",
-    "content": {
     "text": "Newsletter body as plain text",
     "html": "<p>Newsletter body as HTML</p>" ,
-    }
     });
 
     let response = app.post_newsletter(newsletter_request_body).await;
     assert_eq!(response.status().as_u16(), 200);
+}
+
+#[actix_web::test]
+async fn requests_from_unauthenticated_users_are_rejected() {
+    let app = spawn_app().await;
+
+    create_confirmed_subscriber(&app).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(wiremock::ResponseTemplate::new(200))
+        .expect(0)
+        .mount(&app.email_server)
+        .await;
+
+    let newsletter_request_body = serde_json::json!({
+    "title": "Newsletter title",
+    "text": "Newsletter body as plain text",
+    "html": "<p>Newsletter body as HTML</p>" ,
+    });
+
+    let response = app.post_newsletter(newsletter_request_body).await;
+
+    assert_is_redirect_to(&response, "/login");
 }
 
 #[actix_web::test]
@@ -93,90 +73,24 @@ async fn newsletters_get_delivered_to_confirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
+    let login_body = serde_json::json!({
+        "username": app.test_user.username,
+        "password": app.test_user.password
+    });
+
+    let response = app.post_login(login_body).await;
+
+    assert_is_redirect_to(&response, "/admin/dashboard");
+
     let newsletter_request_body = serde_json::json!({
     "title": "Newsletter title",
-    "content": {
     "text": "Newsletter body as plain text",
     "html": "<p>Newsletter body as HTML</p>" ,
-    }
     });
 
     let response = app.post_newsletter(newsletter_request_body).await;
 
     assert_eq!(response.status().as_u16(), 200);
-}
-
-#[actix_web::test]
-async fn requests_missing_authentication_header_are_rejected() {
-    let app = spawn_app().await;
-    let body = serde_json::json!({
-    "title": "Newsletter title",
-    "content": {
-    "text": "Newsletter body as plain text",
-    "html": "<p>Newsletter body as HTML</p>" ,
-    }
-    });
-
-    let response = reqwest::Client::new()
-        .post(format!("{}/newsletters", app.address))
-        .json(&body)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    assert_eq!(response.status().as_u16(), 401);
-    assert_eq!(
-        response.headers()["WWW-Authenticate"],
-        r#"Basic realm="publish""#
-    )
-}
-
-#[actix_web::test]
-async fn non_existing_users_are_rejected() {
-    let app = spawn_app().await;
-    let body = serde_json::json!({
-    "title": "Newsletter title",
-    "content": {
-    "text": "Newsletter body as plain text",
-    "html": "<p>Newsletter body as HTML</p>" ,
-    }
-    });
-
-    let response = reqwest::Client::new()
-        .post(format!("{}/newsletters", app.address))
-        .json(&body)
-        // All users generated for tests are v4 UUIDs so something like this should never be
-        // generated
-        .basic_auth("NonExisting", None::<String>)
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    assert_eq!(response.status().as_u16(), 401);
-}
-
-#[actix_web::test]
-async fn invalid_passwords_are_rejected() {
-    let app = spawn_app().await;
-    let body = serde_json::json!({
-    "title": "Newsletter title",
-    "content": {
-    "text": "Newsletter body as plain text",
-    "html": "<p>Newsletter body as HTML</p>" ,
-    }
-    });
-
-    let response = reqwest::Client::new()
-        .post(format!("{}/newsletters", app.address))
-        .json(&body)
-        // All passwords generated for tests are v4 UUIDs so something like this should never be
-        // generated
-        .basic_auth(app.test_user.username, Some("Invalid password"))
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    assert_eq!(response.status().as_u16(), 401);
 }
 
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {

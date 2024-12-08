@@ -111,8 +111,6 @@ pub enum PasswordChangeError {
     PasswordTooShort,
     #[error("The new password you entered must be at most 128 characters long.")]
     PasswordTooLong,
-    #[error("The user has not logged in")]
-    AnonymousUser,
 }
 
 impl std::fmt::Debug for PasswordChangeError {
