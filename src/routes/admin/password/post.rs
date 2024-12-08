@@ -1,4 +1,4 @@
-use crate::authentication::{validate_credentials, AuthError, Credentials};
+use crate::authentication::{validate_credentials, AuthError, Credentials, UserId};
 use crate::routes::error_chain_fmt;
 use actix_web::error::InternalError;
 use actix_web::{web::Form, HttpResponse};
@@ -6,10 +6,9 @@ use actix_web_flash_messages::FlashMessage;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use unicode_segmentation::UnicodeSegmentation;
-use uuid::Uuid;
 
 use crate::util::get_username;
-use crate::{session_state::TypedSession, util::see_other};
+use crate::util::see_other;
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
@@ -18,14 +17,13 @@ pub struct FormData {
     confirm_password: Secret<String>,
 }
 
-#[tracing::instrument(name = "Change password", skip(form, session))]
+#[tracing::instrument(name = "Change password", skip(form, user_id))]
 pub async fn change_password(
     form: Form<FormData>,
     db_pool: actix_web::web::Data<PgPool>,
-    session: TypedSession,
+    user_id: actix_web::web::ReqData<UserId>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let user_id = reject_anonymous_users(session)?;
-
+    let user_id = user_id.into_inner();
     if form.new_password.expose_secret() != form.confirm_password.expose_secret() {
         return Err(password_change_err(
             PasswordChangeError::MismatchedPasswords,
@@ -34,7 +32,7 @@ pub async fn change_password(
 
     validate_password_strength(&form.current_password).map_err(password_change_err)?;
 
-    let username = get_username(db_pool.as_ref(), user_id)
+    let username = get_username(db_pool.as_ref(), *user_id)
         .await
         .map_err(|e| password_change_err(PasswordChangeError::UnexpectedError(e)))?;
 
@@ -58,21 +56,6 @@ pub async fn change_password(
         .map_err(|e| password_change_err(PasswordChangeError::UnexpectedError(e)))?;
     FlashMessage::error("Your password has been changed.").send();
     Ok(see_other("/admin/change-password"))
-}
-
-fn reject_anonymous_users(session: TypedSession) -> Result<Uuid, actix_web::Error> {
-    let user_id = if let Some(user_id) = session.get_user_id().map_err(|e| {
-        password_change_err(PasswordChangeError::UnexpectedError(anyhow::Error::new(e)))
-    })? {
-        user_id
-    } else {
-        return Err(actix_web::error::InternalError::from_response(
-            PasswordChangeError::AnonymousUser,
-            see_other("/login"),
-        )
-        .into());
-    };
-    Ok(user_id)
 }
 
 fn validate_password_strength(password: &Secret<String>) -> Result<(), PasswordChangeError> {
