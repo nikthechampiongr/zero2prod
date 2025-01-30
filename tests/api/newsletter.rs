@@ -11,14 +11,7 @@ async fn newsletters_are_not_delivered_for_unconfirmed_subscribers() {
 
     create_unconfirmed_subscriber(&app).await;
 
-    let login_body = serde_json::json!({
-        "username": app.test_user.username,
-        "password": app.test_user.password
-    });
-
-    let response = app.post_login(login_body).await;
-
-    assert_is_redirect_to(&response, "/admin/dashboard");
+    app.test_user.login(&app).await;
 
     Mock::given(any())
         .respond_with(ResponseTemplate::new(200))
@@ -32,8 +25,11 @@ async fn newsletters_are_not_delivered_for_unconfirmed_subscribers() {
     "html": "<p>Newsletter body as HTML</p>" ,
     });
 
-    let response = app.post_newsletter(newsletter_request_body).await;
-    assert_eq!(response.status().as_u16(), 200);
+    let response = app.post_newsletters(newsletter_request_body).await;
+    assert_is_redirect_to(&response, "/admin/newsletters");
+
+    let html = app.get_newsletters_html().await;
+    assert!(html.contains("<p><i>The newsletter has been published!</i></p>"));
 }
 
 #[actix_web::test]
@@ -55,7 +51,7 @@ async fn requests_from_unauthenticated_users_are_rejected() {
     "html": "<p>Newsletter body as HTML</p>" ,
     });
 
-    let response = app.post_newsletter(newsletter_request_body).await;
+    let response = app.post_newsletters(newsletter_request_body).await;
 
     assert_is_redirect_to(&response, "/login");
 }
@@ -73,14 +69,21 @@ async fn newsletters_get_delivered_to_confirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
-    let login_body = serde_json::json!({
-        "username": app.test_user.username,
-        "password": app.test_user.password
+    app.test_user.login(&app).await;
+
+    let newsletter_request_body = serde_json::json!({
+    "title": "Newsletter title",
+    "text": "Newsletter body as plain text",
+    "html": "<p>Newsletter body as HTML</p>" ,
     });
 
-    let response = app.post_login(login_body).await;
+    let response = app.post_newsletters(newsletter_request_body).await;
+    assert_is_redirect_to(&response, "/admin/newsletters");
 
-    assert_is_redirect_to(&response, "/admin/dashboard");
+    let html = app.get_newsletters_html().await;
+    assert!(html.contains("<p><i>The newsletter has been published!</i></p>"));
+}
+
 
     let newsletter_request_body = serde_json::json!({
     "title": "Newsletter title",

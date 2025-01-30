@@ -29,7 +29,7 @@ impl TestApp {
             .expect("Failed to execute Request")
     }
 
-    pub async fn post_newsletter(&self, body: serde_json::Value) -> Response {
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> Response {
         self.api_client
             .post(format!("{}/admin/newsletters", self.address))
             .form(&body)
@@ -45,6 +45,17 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute Request")
+    }
+
+    pub async fn get_newsletters_html(&self) -> String {
+        self.api_client
+            .get(format!("{}/admin/newsletters", self.address))
+            .send()
+            .await
+            .expect("Failed to execute Request")
+            .text()
+            .await
+            .unwrap()
     }
 
     pub async fn get_login_html(&self) -> String {
@@ -221,6 +232,17 @@ impl TestUser {
         .execute(db_pool)
         .await
         .expect("Failed to create test user");
+    }
+
+    pub async fn login(&self, app: &TestApp) {
+        let login_body = serde_json::json!({
+            "username": app.test_user.username,
+            "password": app.test_user.password
+        });
+
+        let response = app.post_login(login_body).await;
+
+        assert_is_redirect_to(&response, "/admin/dashboard");
     }
 }
 

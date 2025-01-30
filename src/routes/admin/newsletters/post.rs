@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display};
 
 use actix_web::web;
 use actix_web::HttpResponse;
+use actix_web_flash_messages::FlashMessage;
 use anyhow::anyhow;
 use anyhow::Context;
 use serde::Deserialize;
@@ -10,6 +11,7 @@ use sqlx::PgPool;
 use crate::authentication::UserId;
 use crate::util::e500;
 use crate::util::get_username;
+use crate::util::see_other;
 use crate::{domain::SubscriberEmail, email_client::EmailClient};
 
 #[derive(Deserialize)]
@@ -28,7 +30,6 @@ pub async fn post_newsletters(
     body: web::Form<BodyData>,
     email_client: web::Data<EmailClient>,
     pg_pool: web::Data<PgPool>,
-    request: actix_web::HttpRequest,
     user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let user_id = user_id.into_inner();
@@ -56,7 +57,8 @@ pub async fn post_newsletters(
                 Their stored contact information is invalid"),
         }
     }
-    Ok(HttpResponse::Ok().finish())
+    FlashMessage::info("The newsletter has been published!".to_string()).send();
+    Ok(see_other("/admin/newsletters"))
 }
 
 struct Row {
