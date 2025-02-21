@@ -8,6 +8,11 @@ pub fn e500<T: std::fmt::Display + std::fmt::Debug + 'static>(e: T) -> actix_web
     actix_web::error::ErrorInternalServerError(e)
 }
 
+// Returns 400 for a validation error with the human readable error as the body.
+pub fn e400<T: std::fmt::Display + std::fmt::Debug + 'static>(e: T) -> actix_web::Error {
+    actix_web::error::ErrorBadRequest(e)
+}
+
 pub fn see_other(path: &str) -> HttpResponse {
     HttpResponse::SeeOther()
         .insert_header((actix_web::http::header::LOCATION, path))

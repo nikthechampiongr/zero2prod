@@ -29,7 +29,7 @@ impl TestApp {
             .expect("Failed to execute Request")
     }
 
-    pub async fn post_newsletters(&self, body: serde_json::Value) -> Response {
+    pub async fn post_newsletters<T: serde::Serialize>(&self, body: T) -> Response {
         self.api_client
             .post(format!("{}/admin/newsletters", self.address))
             .form(&body)

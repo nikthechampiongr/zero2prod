@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use wiremock::{
     matchers::{any, method, path},
     Mock, ResponseTemplate,
@@ -23,6 +25,7 @@ async fn newsletters_are_not_delivered_for_unconfirmed_subscribers() {
     "title": "Newsletter title",
     "text": "Newsletter body as plain text",
     "html": "<p>Newsletter body as HTML</p>" ,
+    "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
 
     let response = app.post_newsletters(newsletter_request_body).await;
@@ -49,6 +52,7 @@ async fn requests_from_unauthenticated_users_are_rejected() {
     "title": "Newsletter title",
     "text": "Newsletter body as plain text",
     "html": "<p>Newsletter body as HTML</p>" ,
+    "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
 
     let response = app.post_newsletters(newsletter_request_body).await;
@@ -74,7 +78,8 @@ async fn newsletters_get_delivered_to_confirmed_subscribers() {
     let newsletter_request_body = serde_json::json!({
     "title": "Newsletter title",
     "text": "Newsletter body as plain text",
-    "html": "<p>Newsletter body as HTML</p>" ,
+    "html": "<p>Newsletter body as HTML</p>",
+    "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
 
     let response = app.post_newsletters(newsletter_request_body).await;
@@ -84,16 +89,78 @@ async fn newsletters_get_delivered_to_confirmed_subscribers() {
     assert!(html.contains("<p><i>The newsletter has been published!</i></p>"));
 }
 
+#[actix_web::test]
+async fn newsletter_creation_is_idempotent() {
+    let app = spawn_app().await;
+
+    create_confirmed_subscriber(&app).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(wiremock::ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    app.test_user.login(&app).await;
 
     let newsletter_request_body = serde_json::json!({
     "title": "Newsletter title",
     "text": "Newsletter body as plain text",
     "html": "<p>Newsletter body as HTML</p>" ,
+    "idempotency_key": uuid::Uuid::new_v4().to_string()
     });
 
-    let response = app.post_newsletter(newsletter_request_body).await;
+    let response = app.post_newsletters(&newsletter_request_body).await;
+    assert_is_redirect_to(&response, "/admin/newsletters");
 
-    assert_eq!(response.status().as_u16(), 200);
+    let html = app.get_newsletters_html().await;
+    assert!(html.contains("<p><i>The newsletter has been published!</i></p>"));
+
+    // Do it again
+    let response = app.post_newsletters(newsletter_request_body).await;
+    assert_is_redirect_to(&response, "/admin/newsletters");
+
+    let html = app.get_newsletters_html().await;
+    assert!(html.contains("<p><i>The newsletter has been published!</i></p>"));
+
+    // Mock should verify that it has been sent more than once on drop.
+}
+
+#[actix_web::test]
+async fn concurrent_form_submission_is_handled_gracefully() {
+    let app = spawn_app().await;
+
+    create_confirmed_subscriber(&app).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(wiremock::ResponseTemplate::new(200).set_delay(Duration::from_secs(2)))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    app.test_user.login(&app).await;
+
+    let newsletter_request_body = serde_json::json!({
+    "title": "Newsletter title",
+    "text": "Newsletter body as plain text",
+    "html": "<p>Newsletter body as HTML</p>" ,
+    "idempotency_key": uuid::Uuid::new_v4().to_string()
+    });
+
+    let response1 = app.post_newsletters(&newsletter_request_body);
+    let response2 = app.post_newsletters(&newsletter_request_body);
+
+    let (response1, response2) = tokio::join!(response1, response2);
+
+    assert_eq!(response1.status(), response2.status());
+    assert_eq!(
+        response1.text().await.unwrap(),
+        response2.text().await.unwrap()
+    );
+
+    // Mock should verify that it has been sent more than once on drop.
 }
 
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {

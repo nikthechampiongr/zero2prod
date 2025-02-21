@@ -11,5 +11,9 @@ pub async fn get_newsletters(received: IncomingFlashMessages) -> HttpResponse {
     }
     HttpResponse::Ok()
         .content_type(actix_web::http::header::ContentType::html())
-        .body(format!(include_str!("newsletters.html"), messages))
+        .body(format!(
+            include_str!("newsletters.html"),
+            messages,
+            uuid::Uuid::new_v4() // idempotency key
+        ))
 }
