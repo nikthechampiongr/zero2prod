@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use argon2::PasswordHasher;
 use argon2::PasswordVerifier;
 use secrecy::{ExposeSecret, Secret};
@@ -62,7 +62,7 @@ fn verify_password_hash(
     if let Err(e) = argon2.verify_password(given_password.expose_secret().as_bytes(), &hash) {
         match e {
             argon2::password_hash::Error::Password => {
-                return Err(AuthError::AuthError(anyhow!("Invalid password")))
+                return Err(AuthError::AuthError(anyhow!("Invalid password")));
             }
             _ => return Err(anyhow::Error::new(e).into()),
         }

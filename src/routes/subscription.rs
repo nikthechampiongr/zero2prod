@@ -2,18 +2,18 @@ use std::fmt::{self, Debug};
 
 use crate::{domain::NewSubscriber, startup::ApplicationBaseUrl};
 use anyhow::Context;
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{Rng, distributions::Alphanumeric};
 use sqlx::Postgres;
 use uuid::Uuid;
 
 use actix_web::{
+    HttpResponse, ResponseError,
     http::StatusCode,
     web::{self, Form},
-    HttpResponse, ResponseError,
 };
 
-use crate::email_client::EmailClient;
 use crate::Subscription;
+use crate::email_client::EmailClient;
 
 fn get_subscription_token() -> String {
     let mut rng = rand::thread_rng();

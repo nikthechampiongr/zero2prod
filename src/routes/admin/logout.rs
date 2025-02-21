@@ -1,4 +1,4 @@
-use actix_web::{web::ReqData, HttpResponse};
+use actix_web::{HttpResponse, web::ReqData};
 use actix_web_flash_messages::FlashMessage;
 
 use crate::{authentication::UserId, session_state::TypedSession, util::see_other};

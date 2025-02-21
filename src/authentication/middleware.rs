@@ -1,11 +1,11 @@
 use std::ops::Deref;
 
 use actix_web::{
+    FromRequest, HttpMessage,
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
     error::InternalError,
     middleware::Next,
-    FromRequest, HttpMessage,
 };
 use anyhow::anyhow;
 use uuid::Uuid;

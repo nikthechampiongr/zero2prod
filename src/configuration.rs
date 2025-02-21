@@ -2,8 +2,8 @@ use crate::domain::SubscriberEmail;
 use secrecy::{ExposeSecret, Secret};
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::{
-    postgres::{PgConnectOptions, PgSslMode},
     ConnectOptions,
+    postgres::{PgConnectOptions, PgSslMode},
 };
 use std::convert::TryFrom;
 

@@ -6,17 +6,17 @@ use crate::routes::{
     admin_dashboard, change_password, change_password_form, confirm, health_check, home, log_out,
     login, login_form, subscription,
 };
-use actix_session::storage::RedisSessionStore;
 use actix_session::SessionMiddleware;
+use actix_session::storage::RedisSessionStore;
 use actix_web::cookie::Key;
 use actix_web::{
+    App, HttpServer,
     dev::Server,
     web::{self, Data},
-    App, HttpServer,
 };
 use secrecy::{ExposeSecret, Secret};
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use tracing_actix_web::TracingLogger;
 
 pub struct Application {

@@ -1,8 +1,8 @@
-use crate::helpers::{spawn_app, ConfirmationLinks};
+use crate::helpers::{ConfirmationLinks, spawn_app};
 use sqlx::query;
 use wiremock::{
-    matchers::{method, path},
     Mock, ResponseTemplate,
+    matchers::{method, path},
 };
 
 #[actix_web::test]

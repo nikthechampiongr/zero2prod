@@ -1,4 +1,4 @@
-use std::future::{ready, Ready};
+use std::future::{Ready, ready};
 
 use actix_session::{Session, SessionExt};
 use actix_web::FromRequest;

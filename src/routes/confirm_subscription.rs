@@ -1,8 +1,8 @@
 use actix_web::{
-    web::{self, Query},
     HttpResponse,
+    web::{self, Query},
 };
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]

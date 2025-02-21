@@ -4,8 +4,8 @@ use reqwest::Response;
 use sqlx::{Connection, Executor, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
-use zero2prod::configuration::{get_configuration, DatabaseSettings};
-use zero2prod::startup::{get_connection_pool, Application};
+use zero2prod::configuration::{DatabaseSettings, get_configuration};
+use zero2prod::startup::{Application, get_connection_pool};
 use zero2prod::telemetry;
 use zero2prod::telemetry::init_subscriber;
 

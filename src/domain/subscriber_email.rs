@@ -23,10 +23,10 @@ impl SubscriberEmail {
 mod email_tests {
     use super::SubscriberEmail;
     use claims::assert_err;
-    use fake::faker::internet::en::SafeEmail;
     use fake::Fake;
-    use rand::rngs::StdRng;
+    use fake::faker::internet::en::SafeEmail;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     #[derive(Clone, Debug)]
     struct ValidEmailFixture(pub String);

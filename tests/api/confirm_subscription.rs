@@ -1,9 +1,9 @@
 use wiremock::{
-    matchers::{method, path},
     Mock, ResponseTemplate,
+    matchers::{method, path},
 };
 
-use crate::helpers::{spawn_app, ConfirmationLinks};
+use crate::helpers::{ConfirmationLinks, spawn_app};
 
 #[actix_web::test]
 async fn confirmation_without_token_are_rejected_with_a_400() {

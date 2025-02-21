@@ -1,7 +1,7 @@
-use crate::authentication::{validate_credentials, AuthError, Credentials, UserId};
+use crate::authentication::{AuthError, Credentials, UserId, validate_credentials};
 use crate::routes::error_chain_fmt;
 use actix_web::error::InternalError;
-use actix_web::{web::Form, HttpResponse};
+use actix_web::{HttpResponse, web::Form};
 use actix_web_flash_messages::FlashMessage;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
@@ -44,10 +44,10 @@ pub async fn change_password(
     let uuid = match validate_credentials(db_pool.as_ref(), creds).await {
         Ok(uuid) => uuid,
         Err(AuthError::AuthError(e)) => {
-            return Err(password_change_err(PasswordChangeError::AuthError(e)))
+            return Err(password_change_err(PasswordChangeError::AuthError(e)));
         }
         Err(AuthError::UnexpectedError(e)) => {
-            return Err(password_change_err(PasswordChangeError::UnexpectedError(e)))
+            return Err(password_change_err(PasswordChangeError::UnexpectedError(e)));
         }
     };
 

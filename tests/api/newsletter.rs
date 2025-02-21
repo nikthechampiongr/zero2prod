@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use wiremock::{
-    matchers::{any, method, path},
     Mock, ResponseTemplate,
+    matchers::{any, method, path},
 };
 
-use crate::helpers::{assert_is_redirect_to, spawn_app, ConfirmationLinks, TestApp};
+use crate::helpers::{ConfirmationLinks, TestApp, assert_is_redirect_to, spawn_app};
 
 #[actix_web::test]
 async fn newsletters_are_not_delivered_for_unconfirmed_subscribers() {
