@@ -1,5 +1,4 @@
-use actix_web::{body::to_bytes, HttpResponse};
-use reqwest::StatusCode;
+use actix_web::{body::to_bytes, http::StatusCode, HttpResponse};
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 

@@ -1,4 +1,4 @@
-use validator::validate_email;
+use validator::ValidateEmail;
 
 #[derive(Debug)]
 pub struct SubscriberEmail(String);
@@ -12,7 +12,7 @@ impl AsRef<str> for SubscriberEmail {
 impl SubscriberEmail {
     pub fn parse(email: impl ToString) -> Result<Self, String> {
         let email = email.to_string();
-        if !validate_email(&email) {
+        if !ValidateEmail::validate_email(&email) {
             return Err("Invalid email".to_string());
         }
         Ok(Self(email))
