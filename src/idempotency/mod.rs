@@ -1,3 +1,4 @@
+pub mod expiry_workers;
 mod key;
 mod persistence;
 pub use key::IdempotencyKey;

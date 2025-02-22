@@ -5,7 +5,7 @@ use sqlx::{
     ConnectOptions,
     postgres::{PgConnectOptions, PgSslMode},
 };
-use std::convert::TryFrom;
+use std::{convert::TryFrom, time::Duration};
 
 #[derive(serde::Deserialize, Clone)]
 pub struct Settings {
@@ -21,6 +21,7 @@ pub struct ApplicationSettings {
     pub host: String,
     pub base_url: String,
     pub hmac_secret: Secret<String>,
+    pub idempotency_expiry: Duration,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -69,8 +70,8 @@ impl EmailClientSettings {
         SubscriberEmail::parse(self.sender_email.clone())
     }
 
-    pub fn timeout(&self) -> std::time::Duration {
-        std::time::Duration::from_millis(self.timeout_milliseconds)
+    pub fn timeout(&self) -> Duration {
+        Duration::from_millis(self.timeout_milliseconds)
     }
 
     pub fn client(self) -> EmailClient {

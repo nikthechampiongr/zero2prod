@@ -1,6 +1,9 @@
 application:
   port: 8000
   hmac_secret: "default-hmac-secret-oh-god-do-not-use-this-for-actual-purposes-just-for-testing"
+  idempotency_expiry:
+    secs: 300 # 5 minutes
+    nanos: 0
 database:
   host: "localhost"
   port: 5432
