@@ -1,5 +1,5 @@
 use anyhow::Context;
-use sqlx::{Executor, PgPool, Postgres, Row, Transaction};
+use sqlx::{Executor, PgPool, Postgres, Transaction};
 use std::time::Duration;
 use tracing::{Span, field::display};
 use uuid::Uuid;
@@ -97,9 +97,6 @@ async fn dequeue_task(
     .fetch_optional(&mut *transaction)
     .await?;
 
-    // "Nik why are you manually get()ting stuff?"
-    // sqlx transactions are bugged and if you fetch optional the way god intended  with query!
-    // then sqlx creates a PgRow.
     if let Some(item) = res {
         Ok(Some((
             transaction,
