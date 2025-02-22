@@ -5,6 +5,8 @@ use sqlx::{Connection, Executor, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod::configuration::{DatabaseSettings, get_configuration};
+use zero2prod::email_client::EmailClient;
+use zero2prod::issue_delivery_workers::{TaskOutcome, try_execute_task};
 use zero2prod::startup::{Application, get_connection_pool};
 use zero2prod::telemetry;
 use zero2prod::telemetry::init_subscriber;
@@ -13,6 +15,7 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: sqlx::PgPool,
     pub email_server: MockServer,
+    pub email_client: EmailClient,
     pub port: u16,
     pub test_user: TestUser,
     pub api_client: reqwest::Client,
@@ -27,6 +30,17 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute Request")
+    }
+
+    pub async fn dispatch_all_pending_emails(&self) {
+        loop {
+            if let TaskOutcome::QueueEmpty = try_execute_task(&self.db_pool, &self.email_client)
+                .await
+                .unwrap()
+            {
+                break;
+            }
+        }
     }
 
     pub async fn post_newsletters<T: serde::Serialize>(&self, body: T) -> Response {
@@ -164,6 +178,7 @@ pub async fn spawn_app() -> TestApp {
         db_pool: get_connection_pool(&configuration.database),
         email_server,
         port: application_port,
+        email_client: configuration.email_client.client(),
         test_user,
         api_client,
     };

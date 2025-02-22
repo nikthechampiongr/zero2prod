@@ -56,3 +56,4 @@ strip = true
 claims = "0.7"
 wiremock = "0.6.1"
 linkify = "0.10"
+serde_urlencoded = "0.7.1"

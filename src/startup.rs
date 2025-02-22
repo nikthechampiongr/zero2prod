@@ -1,6 +1,6 @@
 use crate::authentication::reject_anonymous_users;
 use crate::configuration::{DatabaseSettings, Settings};
-use crate::email_client::EmailClient;
+use crate::email_client::{EmailClient};
 use crate::routes::admin::{get_newsletters, post_newsletters};
 use crate::routes::{
     admin_dashboard, change_password, change_password_form, confirm, health_check, home, log_out,
@@ -31,19 +31,7 @@ impl Application {
             configuration.application.host, configuration.application.port
         );
 
-        let sender_email = configuration
-            .email_client
-            .sender()
-            .expect("Invalid email address");
-
-        let timeout = configuration.email_client.timeout();
-
-        let email_client = EmailClient::new(
-            configuration.email_client.base_url,
-            sender_email,
-            configuration.email_client.authorization_token,
-            timeout,
-        );
+        let email_client = configuration.email_client.client();
 
         let db_pool = PgPoolOptions::new()
             .idle_timeout(std::time::Duration::from_secs(2))

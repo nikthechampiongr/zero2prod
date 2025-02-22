@@ -1,7 +1,11 @@
 use std::time::Duration;
 
+use fake::{
+    Fake,
+    faker::{internet::en::SafeEmail, name::en::Name},
+};
 use wiremock::{
-    Mock, ResponseTemplate,
+    Mock, MockBuilder, ResponseTemplate,
     matchers::{any, method, path},
 };
 
@@ -33,6 +37,7 @@ async fn newsletters_are_not_delivered_for_unconfirmed_subscribers() {
 
     let html = app.get_newsletters_html().await;
     assert!(html.contains("<p><i>The newsletter has been published!</i></p>"));
+    app.dispatch_all_pending_emails().await;
 }
 
 #[actix_web::test]
@@ -41,8 +46,7 @@ async fn requests_from_unauthenticated_users_are_rejected() {
 
     create_confirmed_subscriber(&app).await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    when_sending_an_email()
         .respond_with(wiremock::ResponseTemplate::new(200))
         .expect(0)
         .mount(&app.email_server)
@@ -58,6 +62,7 @@ async fn requests_from_unauthenticated_users_are_rejected() {
     let response = app.post_newsletters(newsletter_request_body).await;
 
     assert_is_redirect_to(&response, "/login");
+    app.dispatch_all_pending_emails().await;
 }
 
 #[actix_web::test]
@@ -66,8 +71,7 @@ async fn newsletters_get_delivered_to_confirmed_subscribers() {
 
     create_confirmed_subscriber(&app).await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    when_sending_an_email()
         .respond_with(wiremock::ResponseTemplate::new(200))
         .expect(1)
         .mount(&app.email_server)
@@ -87,6 +91,8 @@ async fn newsletters_get_delivered_to_confirmed_subscribers() {
 
     let html = app.get_newsletters_html().await;
     assert!(html.contains("<p><i>The newsletter has been published!</i></p>"));
+
+    app.dispatch_all_pending_emails().await;
 }
 
 #[actix_web::test]
@@ -95,8 +101,7 @@ async fn newsletter_creation_is_idempotent() {
 
     create_confirmed_subscriber(&app).await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    when_sending_an_email()
         .respond_with(wiremock::ResponseTemplate::new(200))
         .expect(1)
         .mount(&app.email_server)
@@ -124,6 +129,7 @@ async fn newsletter_creation_is_idempotent() {
     let html = app.get_newsletters_html().await;
     assert!(html.contains("<p><i>The newsletter has been published!</i></p>"));
 
+    app.dispatch_all_pending_emails().await;
     // Mock should verify that it has been sent more than once on drop.
 }
 
@@ -133,8 +139,7 @@ async fn concurrent_form_submission_is_handled_gracefully() {
 
     create_confirmed_subscriber(&app).await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    when_sending_an_email()
         .respond_with(wiremock::ResponseTemplate::new(200).set_delay(Duration::from_secs(2)))
         .expect(1)
         .mount(&app.email_server)
@@ -160,14 +165,21 @@ async fn concurrent_form_submission_is_handled_gracefully() {
         response2.text().await.unwrap()
     );
 
+    app.dispatch_all_pending_emails().await;
+
     // Mock should verify that it has been sent more than once on drop.
 }
 
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let name: String = Name().fake();
+    let email: String = SafeEmail().fake();
+    let body = serde_urlencoded::to_string(serde_json::json!({
+        "name": name,
+        "email": email
+    }))
+    .unwrap();
 
-    let _guard = Mock::given(path("/email"))
-        .and(method("POST"))
+    let _guard = when_sending_an_email()
         .respond_with(ResponseTemplate::new(200))
         .expect(1)
         .named("Create unconfirmed subscriber")
@@ -198,4 +210,8 @@ async fn create_confirmed_subscriber(app: &TestApp) {
         .unwrap()
         .error_for_status()
         .unwrap();
+}
+
+fn when_sending_an_email() -> MockBuilder {
+    Mock::given(path("/email")).and(method("POST"))
 }

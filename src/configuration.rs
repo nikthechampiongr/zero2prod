@@ -1,4 +1,4 @@
-use crate::domain::SubscriberEmail;
+use crate::{domain::SubscriberEmail, email_client::EmailClient};
 use secrecy::{ExposeSecret, Secret};
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::{
@@ -71,6 +71,12 @@ impl EmailClientSettings {
 
     pub fn timeout(&self) -> std::time::Duration {
         std::time::Duration::from_millis(self.timeout_milliseconds)
+    }
+
+    pub fn client(self) -> EmailClient {
+        let sender = self.sender().expect("Invalid configuration");
+        let timeout = self.timeout();
+        EmailClient::new(self.base_url, sender, self.authorization_token, timeout)
     }
 }
 
