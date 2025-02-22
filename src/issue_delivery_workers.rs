@@ -83,7 +83,7 @@ async fn dequeue_task(
 ) -> Result<Option<(Transaction<'_, Postgres>, Uuid, String)>, anyhow::Error> {
     let mut transaction = pool.begin().await?;
 
-    let query = sqlx::query!(
+    let res = sqlx::query!(
         r#"
         SELECT 
             newsletter_issue_id,
@@ -93,18 +93,18 @@ async fn dequeue_task(
         SKIP LOCKED
         LIMIT 1
         "#,
-    );
-
-    let res = transaction.fetch_optional(query).await?;
+    )
+    .fetch_optional(&mut *transaction)
+    .await?;
 
     // "Nik why are you manually get()ting stuff?"
     // sqlx transactions are bugged and if you fetch optional the way god intended  with query!
-    // then sqlx creates a row which simply contains Option<()>.
+    // then sqlx creates a PgRow.
     if let Some(item) = res {
         Ok(Some((
             transaction,
-            item.get("newsletter_issue_id"),
-            item.get("subscriber_email"),
+            item.newsletter_issue_id,
+            item.subscriber_email,
         )))
     } else {
         Ok(None)
