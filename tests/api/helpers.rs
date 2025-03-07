@@ -1,5 +1,6 @@
+use std::sync::LazyLock;
+
 use argon2::PasswordHasher;
-use once_cell::sync::Lazy;
 use reqwest::Response;
 use sqlx::{Connection, Executor, PgPool};
 use uuid::Uuid;
@@ -125,7 +126,7 @@ impl TestApp {
     }
 }
 
-static TRACING: Lazy<()> = Lazy::new(|| {
+static TRACING: LazyLock<()> = LazyLock::new(|| {
     let default_filter_level = "info".to_string();
     let subscriber_name = "test".to_string();
 
@@ -141,7 +142,7 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 });
 
 pub async fn spawn_app() -> TestApp {
-    Lazy::force(&TRACING);
+    LazyLock::force(&TRACING);
 
     let email_server = MockServer::start().await;
 

@@ -1,6 +1,6 @@
 use crate::authentication::reject_anonymous_users;
 use crate::configuration::{DatabaseSettings, Settings};
-use crate::email_client::{EmailClient};
+use crate::email_client::EmailClient;
 use crate::routes::admin::{get_newsletters, post_newsletters};
 use crate::routes::{
     admin_dashboard, change_password, change_password_form, confirm, health_check, home, log_out,
@@ -80,11 +80,10 @@ pub async fn run(
     let db_pool = Data::new(db_pool);
     let email_client = Data::new(email_client);
     let base_url = Data::new(ApplicationBaseUrl(base_url));
-    let hmac_secret = Data::new(HmacSecret(hmac_secret));
-    let secret_key = Key::from(hmac_secret.0.expose_secret().as_bytes());
+    let secret_key = Key::from(hmac_secret.expose_secret().as_bytes());
     let redis_store = RedisSessionStore::new(redis_uri.expose_secret()).await?;
     let message_store = actix_web_flash_messages::storage::CookieMessageStore::builder(
-        actix_web::cookie::Key::from(hmac_secret.0.expose_secret().as_bytes()),
+        actix_web::cookie::Key::from(hmac_secret.expose_secret().as_bytes()),
     )
     .build();
     let message_framework =
@@ -98,10 +97,10 @@ pub async fn run(
                 secret_key.clone(),
             ))
             .wrap(TracingLogger::default())
+            .route("/", web::get().to(home))
             .route("/health_check", web::get().to(health_check))
             .route("/subscription", web::post().to(subscription))
             .route("/subscription/confirm", web::get().to(confirm))
-            .route("/", web::get().to(home))
             .route("/login", web::get().to(login_form))
             .route("/login", web::post().to(login))
             .service(
